@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Поймай мяч!</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron :wght@500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: white;
+      font-family: 'Orbitron', sans-serif;
+      text-align: center;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 10px #00ffcc;
+    }
+
+    #scoreboard {
+      font-size: 1.4rem;
+      margin-bottom: 15px;
+      color: #00ffcc;
+    }
+
+    #gameCanvas {
+      background: radial-gradient(circle at top left, #2e7d32, #1b5e20);
+      display: block;
+      margin: 0 auto 20px;
+      border: 3px solid #00ffcc;
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+      width: 512px;
+      height: 512px;
+    }
+
+    .mobile-controls {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      padding: 12px 25px;
+      font-size: 16px;
+      background: linear-gradient(145deg, #1e1e1e, #2c2c2c);
+      color: #00ffcc;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0, 255, 204, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 20px rgba(0, 255, 204, 0.4);
+    }
+
+    .buttons-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      background: linear-gradient(145deg, #0095ff, #0066cc);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0, 150, 255, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 20px rgba(0, 150, 255, 0.5);
+    }
+
+    #soundBtn {
+      background: linear-gradient(145deg, #00cc88, #009966);
+      color: white;
+    }
+
+    #soundBtn:hover {
+      background: linear-gradient(145deg, #00dd99, #00aa66);
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1> catcher ball 🎾</h1>
+  <div id="scoreboard">Очки: <span id="score">0</span></div>
+
+  <!-- Canvas будет строго 512x512 -->
+  <canvas id="gameCanvas" width="512" height="512"></canvas><br>
+
+  <!-- Мобильное управление -->
+  <div class="mobile-controls">
+    <div class="control-btn" id="leftBtn">⬅ Влево</div>
+    <div class="control-btn" id="rightBtn">Вправо ➡</div>
+  </div>
+
+  <!-- Кнопки управления -->
+  <div class="buttons-container">
+    <button onclick="startGame()">Начать игру</button>
+    <button id="soundBtn" onclick="toggleSound()">🔊 Включить звук</button>
+  </div>
+
+  <!-- Аудио -->
+  <audio id="backgroundMusic" loop>
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3 " type="audio/mpeg">
+    Ваш браузер не поддерживает аудио.
+  </audio>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("score");
+    const soundBtn = document.getElementById("soundBtn");
+    const music = document.getElementById("backgroundMusic");
+
+    let platform, ball;
+    let ballSpeedX = 3, ballSpeedY = -3;
+    let rightPressed = false, leftPressed = false;
+    let gameInterval;
+    let gameOver = false;
+    let score = 0;
+    let isSoundOn = false;
+
+    // Установка фиксированного размера canvas
+    canvas.width = 512;
+    canvas.height = 512;
+
+    function startGame() {
+      gameOver = false;
+      score = 0;
+      scoreDisplay.textContent = score;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Платформа
+      platform = {
+        x: canvas.width / 2 - 50,
+        y: canvas.height - 20,
+        width: 100,
+        height: 10,
+        speed: 6
+      };
+
+      // Мяч
+      ball = {
+        x: canvas.width / 2,
+        y: canvas.height - 40,
+        radius: 12
+      };
+
+      clearInterval(gameInterval);
+      gameInterval = setInterval(draw, 10);
+
+      // Очистка и повторная установка событий
+      document.removeEventListener("keydown", keyDownHandler);
+      document.removeEventListener("keyup", keyUpHandler);
+      document.addEventListener("keydown", keyDownHandler);
+      document.addEventListener("keyup", keyUpHandler);
+    }
+
+    function keyDownHandler(e) {
+      const key = e.key.toLowerCase();
+      if (key === "arrowright" || key === "d") {
+        rightPressed = true;
+      }
+      if (key === "arrowleft" || key === "a") {
+        leftPressed = true;
+      }
+    }
+
+    function keyUpHandler(e) {
+      const key = e.key.toLowerCase();
+      if (key === "arrowright" || key === "d") {
+        rightPressed = false;
+      }
+      if (key === "arrowleft" || key === "a") {
+        leftPressed = false;
+      }
+    }
+
+    // Мобильное управление
+    const leftBtn = document.getElementById('leftBtn');
+    const rightBtn = document.getElementById('rightBtn');
+
+    leftBtn.addEventListener('touchstart', () => { leftPressed = true; });
+    leftBtn.addEventListener('touchend', () => { leftPressed = false; });
+    leftBtn.addEventListener('mousedown', () => { leftPressed = true; });
+    leftBtn.addEventListener('mouseup', () => { leftPressed = false; });
+
+    rightBtn.addEventListener('touchstart', () => { rightPressed = true; });
+    rightBtn.addEventListener('touchend', () => { rightPressed = false; });
+    rightBtn.addEventListener('mousedown', () => { rightPressed = true; });
+    rightBtn.addEventListener('mouseup', () => { rightPressed = false; });
+
+    function toggleSound() {
+      if (!isSoundOn) {
+        music.play().catch(() => {
+          alert("Пожалуйста, нажми любую кнопку, чтобы запустить звук.");
+        });
+        soundBtn.textContent = "🔇 Выключить звук";
+        isSoundOn = true;
+      } else {
+        music.pause();
+        soundBtn.textContent = "🔊 Включить звук";
+        isSoundOn = false;
+      }
+    }
+
+    function draw() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Движение платформы
+      if (leftPressed && platform.x > 0) {
+        platform.x -= platform.speed;
+      } else if (rightPressed && platform.x + platform.width < canvas.width) {
+        platform.x += platform.speed;
+      }
+
+      // Рисуем платформу
+      ctx.fillStyle = "#00ffcc";
+      ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+      // Рисуем мяч с градиентом
+      const gradient = ctx.createRadialGradient(
+        ball.x - ball.radius / 2,
+        ball.y - ball.radius / 2,
+        ball.radius / 4,
+        ball.x,
+        ball.y,
+        ball.radius
+      );
+      gradient.addColorStop(0, '#fff');
+      gradient.addColorStop(0.5, '#cc0000');
+      gradient.addColorStop(1, '#660000');
+
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.shadowColor = "#cc0000";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.closePath();
+
+      // Движение мяча
+      ball.x += ballSpeedX;
+      ball.y += ballSpeedY;
+
+      // Столкновение с краями
+      if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+        ballSpeedX = -ballSpeedX;
+      }
+      if (ball.y - ball.radius < 0) {
+        ballSpeedY = -ballSpeedY;
+      }
+
+      // Столкновение с платформой
+      if (
+        ball.y + ball.radius >= platform.y &&
+        ball.x >= platform.x &&
+        ball.x <= platform.x + platform.width
+      ) {
+        ballSpeedY = -ballSpeedY;
+        score++;
+        scoreDisplay.textContent = score;
+      }
+
+      // Поражение
+      if (ball.y + ball.radius > canvas.height) {
+        clearInterval(gameInterval);
+        ctx.fillStyle = "red";
+        ctx.font = "30px Orbitron";
+        ctx.fillText("Игра окончена!", 90, canvas.height / 2);
+        gameOver = true;
+      }
+    }
+
+    // Запуск при загрузке
+    window.addEventListener("load", () => {
+      startGame();
+    });
+  </script>
+
+</body>
+
+</html>
